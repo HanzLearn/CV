@@ -1,8 +1,22 @@
 PYTHON=python 
-SCRIPT=yolo_detect.py
+# SCRIPT=dual_detect_sort.py
+SCRIPT=final_program.py
 
-MODEL=obj.pt 
+
+RACK=rack.pt
+# OBJ=best_obj.pt 
+OBJ = yolo11n_latest2.pt
 SOURCE=test.mov
+THRESH=0.5
+RES=1280x720
+
+# Set RECORD=1 when calling make to enable video recording
+ifeq ($(RECORD),1)
+	RECORD_FLAG=--record
+else
+	RECORD_FLAG=
+endif
 
 run:
-	$(PYTHON) $(SCRIPT) --model $(MODEL) --source $(SOURCE)
+	$(PYTHON) $(SCRIPT) --rack_model $(RACK) --obj_model $(OBJ) --source $(SOURCE) --thresh $(THRESH) $(RECORD_FLAG) --resolution $(RES)
+
