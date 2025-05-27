@@ -297,15 +297,15 @@ def filter_by_rack_and_group_by_frame(detection_df):
 
         if 'Rack_1' in frame_df['rack_id'].values:
             df_rack1 = pd.concat([df_rack1, frame_df[frame_df['rack_id'] == 'Rack_1']], ignore_index=True)
-            print(f"Rack 1 : {frame_df[frame_df['rack_id'] == 'Rack_1']}")
+            
 
         if 'Rack_2' in frame_df['rack_id'].values:
             df_rack2 = pd.concat([df_rack2, frame_df[frame_df['rack_id'] == 'Rack_2']], ignore_index=True)
-            print(f"Rack 2 : {frame_df[frame_df['rack_id'] == 'Rack_2']}")
+            
 
         if 'Rack_3' in frame_df['rack_id'].values:
             df_rack3 = pd.concat([df_rack3, frame_df[frame_df['rack_id'] == 'Rack_3']], ignore_index=True)
-            print(f"Rack 3 : {frame_df[frame_df['rack_id'] == 'Rack_3']}")
+            
 
     return df_rack1, df_rack2, df_rack3
 
@@ -488,6 +488,19 @@ def planogram_analysis(generated_df, expected_df):
     df_to_change.to_csv('received_data/CSV/main_case.csv', index=False)
     return df_to_change
 
+def count_missing_expected_products(result_df):
+    # Filter rows where output is 'EMPTY' (case-insensitive)
+    empty_mask = result_df['output'].str.upper() == 'EMPTY'
+    
+    # Filter the rows that are empty
+    empty_rows = result_df[empty_mask]
+    
+    # Count the expected_class_name occurrences among empty slots
+    missing_counts = empty_rows['expected_class_name'].value_counts().to_dict()
+    
+    return missing_counts
+
+
 def check_planogram(generated_df, expected_df, output_excel_path=None):
     gen = generated_df.rename(columns={'class_name': 'generated_class_name'})
     exp = expected_df.rename(columns={'class_name': 'expected_class_name'})
@@ -521,9 +534,9 @@ def check_planogram(generated_df, expected_df, output_excel_path=None):
             exp_cls = exp_rack.at[i, 'expected_class_name']
 
             if gen_cls == 'empty' or exp_cls == 'empty':
-                output = 'RED'
+                output = 'EMPTY'
             elif gen_cls != exp_cls:
-                output = 'YELLOW'
+                output = 'MISPLACED'
             else:
                 output = ''
 
@@ -542,6 +555,11 @@ def check_planogram(generated_df, expected_df, output_excel_path=None):
 
     result_df = pd.DataFrame(combined_rows)
 
+    missing_summary_dict = count_missing_expected_products(result_df)
+
+    print("Missing product counts:", missing_summary_dict)
+
+
     if output_excel_path:
         def highlight_output(s):
             colors = []
@@ -558,7 +576,19 @@ def check_planogram(generated_df, expected_df, output_excel_path=None):
         styled.to_excel(output_excel_path, index=False)
         print(f"Saved colored output to {output_excel_path}")
 
-    return result_df
+    return result_df, missing_summary_dict
+
+def create_missing_report(missing_summary_dict):
+    # Convert the dict to a DataFrame with two columns: missing_class_name, missing_count
+    report_df = pd.DataFrame({
+        'missing_class_name': list(missing_summary_dict.keys()),
+        'missing_count': list(missing_summary_dict.values())
+    })
+    
+    # Optionally, sort by count descending
+    report_df = report_df.sort_values(by='missing_count', ascending=False).reset_index(drop=True)
+    
+    return report_df
 
 
 if __name__ == '__main__':
@@ -571,5 +601,10 @@ if __name__ == '__main__':
     planogram_df = generate_planogram_df_from_racks(df_rack1, df_rack2, df_rack3)
 
     new_generated_df = planogram_analysis(planogram_df, expected_planogram_df)
-    comparison_df = check_planogram(new_generated_df, expected_planogram_df, "received_data/CSV/planogram_comparison.xlsx")
+    comparison_df,missing_summary_dict = check_planogram(new_generated_df, expected_planogram_df, "received_data/CSV/planogram_comparison.xlsx")
+
+    missing_report_df = create_missing_report(missing_summary_dict)
+    missing_report_df.to_csv("received_data/CSV/missing_report.csv", index=False)
+
+    
     
